@@ -18,10 +18,8 @@ NWLINK = npx --yes -- nwlink@0.0.19
 LINK_GC = 1
 LTO = 0
 
-# Python used to run the PNG serializer
 PYTHON ?= python
 
-# Assets generation
 ASSETS_INPUT = assets/input
 GENERATED_DIR = $(BUILD_DIR)/assets
 
@@ -36,7 +34,6 @@ src = $(addprefix src/,\
   main.cpp \
 )
 
-# Generated objects from PNGs
 PNGS := $(wildcard $(ASSETS_INPUT)/*.png)
 GENERATED_OBJS := $(patsubst $(ASSETS_INPUT)/%.png,$(BUILD_DIR_BUILD)/assets/%.o,$(PNGS))
 GENERATED_OBJS_TEST := $(patsubst $(ASSETS_INPUT)/%.png,$(BUILD_DIR_TEST)/assets/%.o,$(PNGS))
@@ -50,7 +47,7 @@ CFLAGS += -ggdb
 LDFLAGS = -Wl,--relocatable
 LDFLAGS += -nostartfiles
 LDFLAGS += --specs=nano.specs
-LDFLAGS += --specs=nosys.specs # Provide minimal syscall stubs
+LDFLAGS += --specs=nosys.specs
 LDFLAGS += -Wl,--defsym=end=0x20000000 -Wl,--defsym=__exidx_start=0 -Wl,--defsym=__exidx_end=0
 
 ifeq ($(LINK_GC),1)
@@ -92,25 +89,22 @@ $(BUILD_DIR_BUILD)/%.elf: $(BUILD_DIR_BUILD)/%.nwa sim/input.bin
 
 $(BUILD_DIR_BUILD)/app.nwa: $(call object_for_dir,$(BUILD_DIR_BUILD),$(src)) $(GENERATED_OBJS) $(BUILD_DIR_BUILD)/icon.o
 	@echo "LD      $@"
-	$(Q) $(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
+	$(Q) $(CXX) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
-
-# Windows-test build: produce a DLL with mingw
 $(BUILD_DIR_TEST)/app.dll: $(call object_for_dir,$(BUILD_DIR_TEST),$(src)) $(GENERATED_OBJS_TEST) sim/libepsilon.a
 	@echo "LDTEST  $@"
-	$(Q) $(CC_TEST) $(CFLAGS_TEST) $(LDFLAGS_TEST) $^ sim/libepsilon.a -o $@
+	$(Q) $(CXX_TEST) $(CFLAGS_TEST) $(LDFLAGS_TEST) $^ sim/libepsilon.a -o $@
 
 $(addprefix $(BUILD_DIR_BUILD)/,%.o): %.c | $(BUILD_DIR_BUILD)
-	@echo "CC      $^"
+	@echo "CC      $<"
 	$(Q) mkdir -p $(dir $@)
-	$(Q) $(CC) $(CFLAGS) -c $^ -o $@
+	$(Q) $(CC) $(CFLAGS) -c $< -o $@
 
 $(addprefix $(BUILD_DIR_BUILD)/,%.o): %.cpp | $(BUILD_DIR_BUILD)
-	@echo "CXX     $^"
+	@echo "CXX     $<"
 	$(Q) mkdir -p $(dir $@)
-	$(Q) $(CXX) $(CFLAGS) -c $^ -o $@
+	$(Q) $(CXX) $(CFLAGS) -c $< -o $@
 
-# Compile generated C++ sources into build objects
 $(BUILD_DIR_BUILD)/assets/%.o: $(GENERATED_DIR)/%.cpp | $(BUILD_DIR_BUILD)
 	@echo "CXXGEN  $<"
 	$(Q) mkdir -p $(dir $@)
@@ -126,13 +120,11 @@ $(addprefix $(BUILD_DIR_TEST)/,%.o): %.cpp | $(BUILD_DIR_TEST)
 	$(Q) mkdir -p $(dir $@)
 	$(Q) $(CXX_TEST) $(CFLAGS_TEST) -c $^ -o $@
 
-# Explicit rule to compile src/main.cpp for the test build with the test C++ compiler
 $(BUILD_DIR_TEST)/src/main.o: src/main.cpp | $(BUILD_DIR_TEST)
 	@echo "CXXTESTMAIN $<"
 	$(Q) mkdir -p $(dir $@)
 	$(Q) $(CXX_TEST) $(CFLAGS_TEST) -c $< -o $@
 
-# Compile generated C++ sources into test objects
 $(BUILD_DIR_TEST)/assets/%.o: $(GENERATED_DIR)/%.cpp | $(BUILD_DIR_TEST)
 	@echo "CXXTESTGEN $<"
 	$(Q) mkdir -p $(dir $@)
@@ -142,20 +134,16 @@ $(BUILD_DIR_BUILD)/icon.o: assets/icon.png
 	@echo "ICON    $<"
 	$(Q) $(NWLINK) png-icon-o $< $@
 
-# Generate C/C++ implementation and header from PNGs
 $(GENERATED_DIR)/%.cpp: $(ASSETS_INPUT)/%.png | $(GENERATED_DIR)
 	@echo "GEN     $< -> $@"
 	$(Q) mkdir -p $(dir $@)
 	$(Q) cd $(GENERATED_DIR) && $(PYTHON) ../../python/png_serializer.py --png ../../$(ASSETS_INPUT)/$*.png --header $*.h --cimplementation $*.cpp
 
-# Declare that the generated header depends on the generated cpp (both produced by the python script)
 $(GENERATED_DIR)/%.h: $(GENERATED_DIR)/%.cpp ;
 
-# Ensure main objects are built after generated headers so the python serializer runs first
-$(BUILD_DIR_BUILD)/src/main.o: $(GENERATED_HEADERS)
-$(BUILD_DIR_TEST)/src/main.o: $(GENERATED_HEADERS)
+$(BUILD_DIR_BUILD)/src/main.o: $(GENERATED_SRCS)
+$(BUILD_DIR_TEST)/src/main.o: $(GENERATED_SRCS)
 
-# Ensure generated directory exists
 $(GENERATED_DIR):
 	$(Q) mkdir -p $(GENERATED_DIR)
 
