@@ -1,4 +1,4 @@
-#Q ?= @
+Q ?= @
 CC = arm-none-eabi-gcc
 CXX = arm-none-eabi-g++
 BUILD_DIR = output
@@ -6,7 +6,7 @@ BUILD_DIR_BUILD = output/build
 BUILD_DIR_TEST = output/sim
 CC_TEST = x86_64-w64-mingw32-gcc
 CXX_TEST = x86_64-w64-mingw32-g++
-CFLAGS_TEST = -std=c99
+CFLAGS_TEST = -std=c++20
 CFLAGS_TEST += -Os -Wall
 CFLAGS_TEST += -ggdb
 LDFLAGS_TEST = -shared
@@ -40,7 +40,7 @@ GENERATED_OBJS_TEST := $(patsubst $(ASSETS_INPUT)/%.png,$(BUILD_DIR_TEST)/assets
 GENERATED_SRCS := $(patsubst $(ASSETS_INPUT)/%.png,$(GENERATED_DIR)/%.cpp,$(PNGS))
 GENERATED_HEADERS := $(patsubst $(ASSETS_INPUT)/%.png,$(GENERATED_DIR)/%.h,$(PNGS))
 
-CFLAGS = -std=gnu99
+CFLAGS = -std=c++20
 CFLAGS += $(shell $(NWLINK) eadk-cflags-device)
 CFLAGS += -Os -Wall
 CFLAGS += -ggdb
@@ -157,4 +157,4 @@ $(BUILD_DIR_TEST):
 .PHONY: clean
 clean:
 	@echo "CLEAN"
-	$(Q) rm -rf $(BUILD_DIR_BUILD) $(BUILD_DIR_TEST)
+	$(Q) rm -rf output/

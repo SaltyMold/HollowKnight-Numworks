@@ -15,84 +15,104 @@
 
 using namespace EADK;
 
+Keyboard::State prev_state;
+Keyboard::State state;
+
+int xKnight = 160;
+int yKnight = 120;
+int xCamera = 0;
+int yCamera = 0;
+
+bool inBounds(int x, int y, int width, int height) {
+	return (x >= 0 && x < EADK_SCREEN_WIDTH || x > UINT16_MAX - width + 1 && x <= UINT16_MAX) &&
+	       (y >= 0 && y < EADK_SCREEN_HEIGHT || y > UINT16_MAX - height + 1 && y <= UINT16_MAX);
+}
+
+void display(bool bg = false) {
+	if (bg) {
+		//eadk_display_push_rect_uniform(eadk_screen_rect, eadk_color_red); // bg
+	}
+
+	// if in screen bounds, draw floor
+	Point floor_start_point(100 - xCamera, 100 - yCamera);
+	//if ((floor_start_point.y() >= 0 && floor_start_point.y() < EADK_SCREEN_HEIGHT || floor_start_point.y() > UINT16_MAX - 10 + 1 && floor_start_point.y() <= UINT16_MAX) && // y
+	//	(floor_start_point.x() >= 0 && floor_start_point.x() < EADK_SCREEN_WIDTH || floor_start_point.x() > UINT16_MAX - 80 + 1 && floor_start_point.x() <= UINT16_MAX))   // x
+
+	if (inBounds(floor_start_point.x(), floor_start_point.y(), 80, 10)) {
+		eadk_display_push_rect_uniform(eadk_screen_rect, eadk_color_green);
+		DRAW_IMAGE_TRANSPARENT(floor_start_point, Image::FloorStone80x10);
+	}
+	else {
+		eadk_display_push_rect_uniform(eadk_screen_rect, eadk_color_red);
+	}
+
+	char buf[64];
+	snprintf(buf, sizeof(buf), "xKnight: %d", xKnight);
+	eadk_display_draw_string(buf, (eadk_point_t){0, 0}, false, eadk_color_black, eadk_color_white);
+	snprintf(buf, sizeof(buf), "yKnight: %d", yKnight);
+	eadk_display_draw_string(buf, (eadk_point_t){0, 12}, false, eadk_color_black, eadk_color_white);
+	snprintf(buf, sizeof(buf), "xCamera: %d", xCamera);
+	eadk_display_draw_string(buf, (eadk_point_t){0, 24}, false, eadk_color_black, eadk_color_white);
+	snprintf(buf, sizeof(buf), "yCamera: %d", yCamera);
+	eadk_display_draw_string(buf, (eadk_point_t){0, 36}, false, eadk_color_black, eadk_color_white);
+	snprintf(buf, sizeof(buf), "floor_start_point.x(): %d", floor_start_point.x());
+	eadk_display_draw_string(buf, (eadk_point_t){0, 48}, false, eadk_color_black, eadk_color_white);
+	snprintf(buf, sizeof(buf), "floor_start_point.y(): %d", floor_start_point.y());
+	eadk_display_draw_string(buf, (eadk_point_t){0, 60}, false, eadk_color_black, eadk_color_white);
+
+	DRAW_IMAGE_TRANSPARENT(Point(xKnight - xCamera, yKnight - yCamera), Image::KnightAFK14x30);
+}
 
 int main(void) {
-	int x = 100;
-	int y = 240 - 50 - 30; 
 
-	for (int i = 0; i < 240; i++) {
-		for (int j = 0; j < 320; j++) {
-			Display::pushRectUniform(Rect(j, i, 1, 1), EADK::random() % 0xFFFFFF);
-		}
-	}
+	display();
 
-	for (int i = 0; i < 4; i++) {
-		DRAW_IMAGE_AT(Point(i * 80, 240 - 50), Image::FloorStone80x10);
-	}
-
-	// Prepare background buffer for the knight sprite to avoid trails.
-	const int knightW = Image::KnightAFK14x30::k_width;
-	const int knightH = Image::KnightAFK14x30::k_height;
-	const size_t knightPixels = (size_t)knightW * (size_t)knightH;
-	eadk_color_t *bgBuffer = (eadk_color_t *)malloc(knightPixels * sizeof(eadk_color_t));
-	if (!bgBuffer) return 1;
-
-	EADK::Rect knightRect(x, y, knightW, knightH);
-	eadk_display_pull_rect(knightRect, bgBuffer);
-    
 	int target_fps = 30;
-	Keyboard::State state;
+	int frame_count = 0;
+
+	int dx = 0;
+	int dy = 0;
+	
 	while (1) {
 		uint64_t start_frame_ts_ms = eadk_timing_millis();
 
 		// ----------------------------
 
+		dx = 0;
+		dy = 0;
+
 		state = Keyboard::scan();
 		if (state.keyDown(Keyboard::Key::Back)) break;
+		// crash
+		if (state.keyDown(Keyboard::Key::EXE) && state.keyDown(Keyboard::Key::Zero)) {
+			volatile int *ptr = (int *)0xFFFFFFFF;
+        	*ptr = 0;
+		}
+			
 		
-		if (state.keyDown(Keyboard::Key::Left)) {
-			// restore previous background
-			eadk_display_push_rect(knightRect, bgBuffer);
-			x--;
-			knightRect = EADK::Rect(x, y, knightW, knightH);
-			eadk_display_pull_rect(knightRect, bgBuffer);
-			DRAW_IMAGE_AT(Point(x, y), Image::KnightAFK14x30);
-			Timing::msleep(2);
-		}
-		if (state.keyDown(Keyboard::Key::Right)) {
-			// restore previous background
-			eadk_display_push_rect(knightRect, bgBuffer);
-			x++;
-			knightRect = EADK::Rect(x, y, knightW, knightH);
-			eadk_display_pull_rect(knightRect, bgBuffer);
-			DRAW_IMAGE_AT(Point(x, y), Image::KnightAFK14x30);
-			Timing::msleep(2);
-		}
-		if (state.keyDown(Keyboard::Key::Up)) {
-			// restore previous background
-			eadk_display_push_rect(knightRect, bgBuffer);
-			y--;
-			knightRect = EADK::Rect(x, y, knightW, knightH);
-			eadk_display_pull_rect(knightRect, bgBuffer);
-			DRAW_IMAGE_AT(Point(x, y), Image::KnightAFK14x30);
-			Timing::msleep(2);
-		}
-		if (state.keyDown(Keyboard::Key::Down)) {
-			// restore previous background
-			eadk_display_push_rect(knightRect, bgBuffer);
-			y++;
-			knightRect = EADK::Rect(x, y, knightW, knightH);
-			eadk_display_pull_rect(knightRect, bgBuffer);
-			DRAW_IMAGE_AT(Point(x, y), Image::KnightAFK14x30);
-			Timing::msleep(2);
+		if (state.keyDown(Keyboard::Key::Left))  dx -= 1;
+		if (state.keyDown(Keyboard::Key::Right)) dx += 1;
+
+		if (state.keyDown(Keyboard::Key::Up))    dy -= 1;
+		if (state.keyDown(Keyboard::Key::Down))  dy += 1;
+
+		if (dx != 0 || dy != 0) {
+			xKnight += dx;
+			yKnight += dy;
+			xCamera += dx;
+			yCamera += dy;
+			display(state.keyDown(Keyboard::Key::OK) ? true : false);
 		}
 
 		// ----------------------------
 
+		frame_count++;
+
         uint64_t end_frame_ts_ms = eadk_timing_millis();
-		uint64_t frame_duration_ms = end_frame_ts_ms - start_frame_ts_ms;
+		int frame_duration_ms = end_frame_ts_ms - start_frame_ts_ms;
 		int sleep_ms = (1000 / target_fps) > frame_duration_ms ? (1000 / target_fps) - frame_duration_ms : 0;
 
+		/*
 		char buf[64];
 		snprintf(buf, sizeof(buf), "start_frame_ts_ms: %d", (int)(start_frame_ts_ms));
 		eadk_display_draw_string(buf, (eadk_point_t){0, 0}, false, eadk_color_black, eadk_color_white);
@@ -116,11 +136,10 @@ int main(void) {
 
 		snprintf(buf, sizeof(buf), "fps_capped: %d", fps_capped);
 		eadk_display_draw_string(buf, (eadk_point_t){0, 72}, false, eadk_color_black, eadk_color_white);
-	}
+		*/
 
-	// Restore last background and free buffer
-	eadk_display_push_rect(knightRect, bgBuffer);
-	free(bgBuffer);
+		eadk_timing_msleep(sleep_ms);
+	}
 
 	return 0;
 }

@@ -5,13 +5,14 @@ import os.path
 import png
 import stringcase
 
+TRANSPARENT_KEY = (255, 0, 255)
+
 def alpha_blending(intensity, alpha):
     intensity_double = intensity / 255.0
-    # Assume a white background (1.0, 1.0, 1.0) in the blending
     intensity_double = intensity_double * alpha + (1.0 - alpha) * 1.0
     return int(intensity_double * 255.0)
 
-
+"""
 def rgba8882rgb565(red, green, blue, alpha):
     alpha = alpha / 255.0
     r, g, b = (
@@ -19,6 +20,14 @@ def rgba8882rgb565(red, green, blue, alpha):
         alpha_blending(green, alpha),
         alpha_blending(blue, alpha),
     )
+    return (r >> 3) << 11 | (g >> 2) << 5 | (b >> 3)
+"""
+
+def rgba8882rgb565(red, green, blue, alpha):
+    if alpha == 0:
+        r, g, b = TRANSPARENT_KEY
+    else:
+        r, g, b = red, green, blue
     return (r >> 3) << 11 | (g >> 2) << 5 | (b >> 3)
 
 
