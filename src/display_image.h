@@ -15,7 +15,8 @@ static inline void drawCompressedImage(
     const uint8_t *compressedData,
     uint32_t compressedSize,
     uint32_t width,
-    uint32_t height)
+    uint32_t height,
+    bool invert = false)
 {
     const size_t bufferSize = (size_t)width * (size_t)height * sizeof(eadk_color_t);
 
@@ -29,7 +30,24 @@ static inline void drawCompressedImage(
         (int)bufferSize);
 
     if (ret > 0) {
-        eadk_display_push_rect(rect, buffer);
+        if (!invert) {
+            eadk_display_push_rect(rect, buffer);
+        } else {
+            eadk_color_t *flipped = (eadk_color_t *)malloc(bufferSize);
+            if (flipped) {
+                for (uint32_t y = 0; y < height; y++) {
+                    for (uint32_t x = 0; x < width; x++) {
+                        size_t src = (size_t)y * width + x;
+                        size_t dst = (size_t)y * width + (width - 1 - x);
+                        flipped[dst] = buffer[src];
+                    }
+                }
+                eadk_display_push_rect(rect, flipped);
+                free(flipped);
+            } else {
+                eadk_display_push_rect(rect, buffer);
+            }
+        }
     }
 
     free(buffer);
@@ -40,23 +58,26 @@ static inline void drawCompressedImage(
     const uint8_t *compressedData,
     uint32_t compressedSize,
     uint32_t width,
-    uint32_t height)
+    uint32_t height,
+    bool invert = false)
 {
     drawCompressedImage(
         EADK::Rect(origin.x(), origin.y(), (int)width, (int)height),
         compressedData,
         compressedSize,
         width,
-        height);
+        height,
+        invert);
 }
 
-#define DRAW_IMAGE(point, image_ns) \
+#define DRAW_IMAGE(point, image_ns, ...) \
     DisplayImage::drawCompressedImage( \
         point, \
         image_ns::compressedPixelData, \
         image_ns::k_compressedPixelSize, \
         image_ns::k_width, \
-        image_ns::k_height)
+        image_ns::k_height, \
+        ##__VA_ARGS__)
 
 // -----------------------------
 
@@ -65,7 +86,8 @@ static inline void drawCompressedImageTransparent(
     const uint8_t *compressedData,
     uint32_t compressedSize,
     uint32_t width,
-    uint32_t height)
+    uint32_t height,
+    bool invert = false)
 {
     EADK::Rect rect(origin.x(), origin.y(), (int)width, (int)height);
 
@@ -101,19 +123,37 @@ static inline void drawCompressedImageTransparent(
         }
     }
 
-    eadk_display_push_rect(rect, img);
+    if (!invert) {
+        eadk_display_push_rect(rect, img);
+    } else {
+        eadk_color_t *flipped = (eadk_color_t *)malloc(bufferSize);
+        if (flipped) {
+            for (uint32_t y = 0; y < height; y++) {
+                for (uint32_t x = 0; x < width; x++) {
+                    size_t src = (size_t)y * width + x;
+                    size_t dst = (size_t)y * width + (width - 1 - x);
+                    flipped[dst] = img[src];
+                }
+            }
+            eadk_display_push_rect(rect, flipped);
+            free(flipped);
+        } else {
+            eadk_display_push_rect(rect, img);
+        }
+    }
 
     free(img);
     free(bg);
 }
 
-#define DRAW_IMAGE_TRANSPARENT(point, image_ns) \
+#define DRAW_IMAGE_TRANSPARENT(point, image_ns, ...) \
     DisplayImage::drawCompressedImageTransparent( \
         point, \
         image_ns::compressedPixelData, \
         image_ns::k_compressedPixelSize, \
         image_ns::k_width, \
-        image_ns::k_height)
+        image_ns::k_height, \
+        ##__VA_ARGS__)
 
 } // DisplayImage
 
