@@ -124,7 +124,7 @@ static inline void drawCroppedImage(
         }
     }
 
-    EADK::Rect dstRect(origin.x(), origin.y(), (int)outW, (int)outH);
+    EADK::Rect dstRect(origin.x() + (int)cropLeft, origin.y() + (int)cropTop, (int)outW, (int)outH);
 
     eadk_color_t *bg = (eadk_color_t *)malloc(outBufferSize);
     if (!bg) {

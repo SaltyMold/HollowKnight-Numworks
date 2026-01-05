@@ -1,4 +1,4 @@
-Q ?= @
+#Q ?= @
 CC = arm-none-eabi-gcc
 CXX = arm-none-eabi-g++
 BUILD_DIR = output
@@ -64,10 +64,10 @@ LDFLAGS += -flinker-output=nolto-rel
 endif
 
 .PHONY: build
-build: $(BUILD_DIR_BUILD)/app.nwa
+build: $(BUILD_DIR_BUILD)/app_stripped.nwa
 
 .PHONY: check
-check: $(BUILD_DIR_BUILD)/app.bin
+check: $(BUILD_DIR_BUILD)/app_stripped.bin
 
 .PHONY: run
 run: $(BUILD_DIR_BUILD)/app.nwa sim/input.bin
@@ -90,6 +90,10 @@ $(BUILD_DIR_BUILD)/%.elf: $(BUILD_DIR_BUILD)/%.nwa sim/input.bin
 $(BUILD_DIR_BUILD)/app.nwa: $(call object_for_dir,$(BUILD_DIR_BUILD),$(src)) $(GENERATED_OBJS) $(BUILD_DIR_BUILD)/icon.o
 	@echo "LD      $@"
 	$(Q) $(CXX) $(CFLAGS) $(LDFLAGS) $^ -o $@
+
+$(BUILD_DIR_BUILD)/app_stripped.nwa: $(BUILD_DIR_BUILD)/app.nwa | $(BUILD_DIR_BUILD)
+	@echo "STRIP   $< -> $@"
+	$(Q) arm-none-eabi-strip --strip-unneeded $< -o $@
 
 $(BUILD_DIR_TEST)/app.dll: $(call object_for_dir,$(BUILD_DIR_TEST),$(src)) $(GENERATED_OBJS_TEST) sim/libepsilon.a
 	@echo "LDTEST  $@"
@@ -137,7 +141,7 @@ $(BUILD_DIR_BUILD)/icon.o: assets/icon.png
 $(GENERATED_DIR)/%.cpp: $(ASSETS_INPUT)/%.png | $(GENERATED_DIR)
 	@echo "GEN     $< -> $@"
 	$(Q) mkdir -p $(dir $@)
-	$(Q) cd $(GENERATED_DIR) && $(PYTHON) ../../python/png_serializer.py --png ../../$(ASSETS_INPUT)/$*.png --header $*.h --cimplementation $*.cpp
+	$(Q) cd $(GENERATED_DIR) && $(PYTHON) ../../python/png_serializer.py --png ../../$(ASSETS_INPUT)/$*.png --header $*.h --cimplementation $*.cpp -v
 
 $(GENERATED_DIR)/%.h: $(GENERATED_DIR)/%.cpp ;
 

@@ -1,3 +1,6 @@
 .vscode/
 output/
-assets/sprites/
+assets/textures/
+assets/map/rooms/Combined_100%.png
+assets/map/rooms/Combined_50%.png
+assets/map/rooms/Combined_25%.png

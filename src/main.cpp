@@ -28,6 +28,40 @@ bool inBounds(int x, int y, int width, int height) {
 	       (y >= 0 && y < EADK_SCREEN_HEIGHT || y > UINT16_MAX - height + 1 && y <= UINT16_MAX);
 }
 
+static inline void computeCrop(const EADK::Point &origin, int imgW, int imgH,
+							   uint32_t &cropLeft, uint32_t &cropTop,
+							   uint32_t &cropRight, uint32_t &cropBottom)
+{
+	// origin.x() and origin.y() overflow to UINT16_MAX after going below 0
+
+	if (origin.x() > UINT16_MAX - imgW + 1) {
+		cropLeft = UINT16_MAX - origin.x() + 1;
+	}
+	else {
+		cropLeft = 0;
+	}
+
+	if (origin.y() > UINT16_MAX - imgH + 1) {
+		cropTop = UINT16_MAX - origin.y() + 1;
+	}
+	else {
+		cropTop = 0;
+	}
+	
+	
+	if (origin.x() < EADK_SCREEN_WIDTH && origin.x() + imgW > EADK_SCREEN_WIDTH) {
+		cropRight = (uint32_t)(origin.x() + imgW - EADK_SCREEN_WIDTH);
+	} else {
+		cropRight = 0;
+	}
+
+	if (origin.y() < EADK_SCREEN_HEIGHT && origin.y() + imgH > EADK_SCREEN_HEIGHT) {
+		cropBottom = (uint32_t)(origin.y() + imgH - EADK_SCREEN_HEIGHT);
+	} else {
+		cropBottom = 0;
+	}
+}
+
 void display(bool bg = false) {
 	if (bg) {
 		//eadk_display_push_rect_uniform(eadk_screen_rect, eadk_color_red); // bg
@@ -38,14 +72,23 @@ void display(bool bg = false) {
 	//if ((floor_start_point.y() >= 0 && floor_start_point.y() < EADK_SCREEN_HEIGHT || floor_start_point.y() > UINT16_MAX - 10 + 1 && floor_start_point.y() <= UINT16_MAX) && // y
 	//	(floor_start_point.x() >= 0 && floor_start_point.x() < EADK_SCREEN_WIDTH || floor_start_point.x() > UINT16_MAX - 80 + 1 && floor_start_point.x() <= UINT16_MAX))   // x
 
+	uint32_t cropLeft, cropTop, cropRight, cropBottom;
+
 	if (inBounds(floor_start_point.x(), floor_start_point.y(), 80, 10)) {
 		eadk_display_push_rect_uniform(eadk_screen_rect, eadk_color_green);
-		DRAW_IMAGE_TRANSPARENT(floor_start_point, Image::FloorStone80x10);
+
+		const int imgW = 80;
+		const int imgH = 10;
+
+		computeCrop(floor_start_point, imgW, imgH, cropLeft, cropTop, cropRight, cropBottom);
+
+		DRAW_IMAGE_CROPPED(floor_start_point, Image::FloorStone80x10, cropLeft, cropTop, cropRight, cropBottom);
 	}
 	else {
 		eadk_display_push_rect_uniform(eadk_screen_rect, eadk_color_red);
 	}
 
+	// /*
 	char buf[64];
 	snprintf(buf, sizeof(buf), "xKnight: %d", xKnight);
 	eadk_display_draw_string(buf, (eadk_point_t){0, 0}, false, eadk_color_black, eadk_color_white);
@@ -59,8 +102,18 @@ void display(bool bg = false) {
 	eadk_display_draw_string(buf, (eadk_point_t){0, 48}, false, eadk_color_black, eadk_color_white);
 	snprintf(buf, sizeof(buf), "floor_start_point.y(): %d", floor_start_point.y());
 	eadk_display_draw_string(buf, (eadk_point_t){0, 60}, false, eadk_color_black, eadk_color_white);
+	snprintf(buf, sizeof(buf), "cropLeft: %d", (int)cropLeft);
+	eadk_display_draw_string(buf, (eadk_point_t){0, 72}, false, eadk_color_black, eadk_color_white);
+	snprintf(buf, sizeof(buf), "cropTop: %d", (int)cropTop);
+	eadk_display_draw_string(buf, (eadk_point_t){0, 84}, false, eadk_color_black, eadk_color_white);
+	snprintf(buf, sizeof(buf), "cropRight: %d", (int)cropRight);
+	eadk_display_draw_string(buf, (eadk_point_t){0, 96}, false, eadk_color_black, eadk_color_white);
+	snprintf(buf, sizeof(buf), "cropBottom: %d", (int)cropBottom);
+	eadk_display_draw_string(buf, (eadk_point_t){0, 108}, false, eadk_color_black, eadk_color_white);
+	// */
 
-	DRAW_IMAGE_TRANSPARENT(Point(xKnight - xCamera, yKnight - yCamera), Image::KnightAFK14x30);
+	
+	DRAW_IMAGE(Point(xKnight - xCamera, yKnight - yCamera), Image::KnightAFK14x30, false);
 }
 
 int main(void) {
@@ -72,7 +125,7 @@ int main(void) {
 
 	int dx = 0;
 	int dy = 0;
-	
+		
 	while (1) {
 		uint64_t start_frame_ts_ms = eadk_timing_millis();
 
@@ -101,7 +154,7 @@ int main(void) {
 			yKnight += dy;
 			xCamera += dx;
 			yCamera += dy;
-			display(state.keyDown(Keyboard::Key::OK) ? true : false);
+			display();
 		}
 
 		// ----------------------------

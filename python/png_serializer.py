@@ -43,17 +43,36 @@ def generate_c_files(png_file, header_file_name, cimplementation_file_name, verb
     png_name_upper_snake_case = stringcase.uppercase(png_name_snake_case)
     png_name_camel_case = stringcase.capitalcase(stringcase.camelcase(png_file))
 
-    # Convert RGBA888 to RGB565
-    dataRGB565 = []
-    for row in data:
+    # Convert RGBA888 to RGB565 (use bytearray to avoid large-list memory overhead)
+    # Force usage of lz4.block.compress to keep binary output identical.
+    dataRGB565 = bytearray()
+    # Progress tracking (prints like "1% 2% ") when verbose is True
+    next_pct = 1
+    for row_index, row in enumerate(data):
         for i in range(0, len(row), 4):
             r, g, b, a = row[i], row[i + 1], row[i + 2], row[i + 3]
             dataRGB565.extend(rgba8882rgb565(r, g, b, a).to_bytes(2, "little"))
-    # Compress data
+        if verbose:
+            pct = int((row_index + 1) * 100 / height)
+            while pct >= next_pct and next_pct <= 100:
+                print(str(next_pct) + "% ", end="", flush=True)
+                next_pct += 1
+    if verbose:
+        print()
+
+    # Compress data using lz4.block (same format as original behavior)
     compressed_data = lz4.block.compress(
         bytes(dataRGB565), compression=12, mode="high_compression", store_size=False
     )
     compressed_data_len = len(compressed_data)
+
+    # Determine uncompressed size for reporting
+    if 'total_uncompressed' in locals():
+        uncompressed_len = total_uncompressed
+    elif 'dataRGB565' in locals():
+        uncompressed_len = len(dataRGB565)
+    else:
+        uncompressed_len = width * height * 2
 
     # Generate header file
     header_file = open(header_file_name, "w")
@@ -92,7 +111,7 @@ def generate_c_files(png_file, header_file_name, cimplementation_file_name, verb
         + " pixels into "
         + str(compressed_data_len)
         + " bytes ("
-        + str(100.0 * compressed_data_len / len(dataRGB565))
+        + str(100.0 * compressed_data_len / uncompressed_len)
         + "% compression ratio)\n\n"
     )
     cimplementation_file.write(
