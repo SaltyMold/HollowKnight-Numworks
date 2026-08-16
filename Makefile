@@ -29,6 +29,7 @@ src = $(addprefix src/,\
   fps.c \
   libs/storage.c \
   main.c \
+  jpg.c \
 	data.c \
 )
 

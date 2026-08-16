@@ -16,6 +16,7 @@ size_t data_input_size(void) {
 
 int data_input_copy(size_t offset, size_t len, void *dst) {
     if (dst == NULL) return -1;
+    //if (sizeof(dst) < len) return -1;
     size_t avail = data_input_size();
     if (offset >= avail) return 0;
     size_t max_copy = avail - offset;
