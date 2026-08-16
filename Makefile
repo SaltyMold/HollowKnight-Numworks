@@ -26,6 +26,8 @@ $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(1))))
 endef
 
 src = $(addprefix src/,\
+  libs/TJpg_Decoder/tjpgd.c \
+  fps.c \
   libs/storage.c \
   main.c \
 )
