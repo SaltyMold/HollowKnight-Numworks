@@ -19,7 +19,6 @@ endef
 NWLINK = npm_config_loglevel=silent npx --yes --quiet -- nwlink@0.0.19
 LINK_GC = 1
 LTO = 1
-EXTERNAL_DATA ?= assets/input.bin
 
 define object_for
 $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(1))))
@@ -30,7 +29,11 @@ src = $(addprefix src/,\
   fps.c \
   libs/storage.c \
   main.c \
+	data.c \
 )
+
+BIN_ASSET = assets/input.bin
+
 
 # Platform selection: set PLATFORM=simulator when building/running on host simulator
 PLATFORM ?= device
@@ -84,43 +87,39 @@ check: $(BUILD_DIR_DEVICE)/app.bin
 run: build
 	@echo "RUN ($(PLATFORM))"
 	$(Q) if [ "$(PLATFORM)" = "simulator" ]; then \
-		if [ -s $(EXTERNAL_DATA) ]; then \
-			./sim/epsilon.bin --nwb $(BUILD_DIR_SIMULATOR)/app.nwb --nwb-external-data $(EXTERNAL_DATA); \
-		else \
-			./sim/epsilon.bin --nwb $(BUILD_DIR_SIMULATOR)/app.nwb; \
-		fi; \
+		./sim/epsilon.bin --nwb $(BUILD_DIR_SIMULATOR)/app.nwb; \
 	else \
-		if [ -s $(EXTERNAL_DATA) ]; then \
-			$(NWLINK) install-nwa --external-data $(EXTERNAL_DATA) $(BUILD_DIR_DEVICE)/app.nwa; \
-		else \
-			$(NWLINK) install-nwa $(BUILD_DIR_DEVICE)/app.nwa; \
-		fi; \
+		$(NWLINK) install-nwa $(BUILD_DIR_DEVICE)/app.nwa; \
 	fi
 
-$(BUILD_DIR_DEVICE)/%.bin: $(BUILD_DIR_DEVICE)/%.nwa $(EXTERNAL_DATA)
+$(BUILD_DIR_DEVICE)/%.bin: $(BUILD_DIR_DEVICE)/%.nwa
 	@echo "BIN     $@"
-	$(Q) if [ -s $(EXTERNAL_DATA) ]; then \
-		$(NWLINK) nwa-bin --external-data $(EXTERNAL_DATA) $< $@; \
-	else \
-		$(NWLINK) nwa-bin $< $@; \
-	fi
+	$(Q) $(NWLINK) nwa-bin $< $@
 
-$(BUILD_DIR_DEVICE)/%.elf: $(BUILD_DIR_DEVICE)/%.nwa $(EXTERNAL_DATA)
+$(BUILD_DIR_DEVICE)/%.elf: $(BUILD_DIR_DEVICE)/%.nwa
 	@echo "ELF     $@"
-	$(Q) if [ -s $(EXTERNAL_DATA) ]; then \
-		$(NWLINK) nwa-elf --external-data $(EXTERNAL_DATA) $< $@; \
-	else \
-		$(NWLINK) nwa-elf $< $@; \
-	fi
+	$(Q) $(NWLINK) nwa-elf $< $@
 
-$(BUILD_DIR_DEVICE)/app.nwa: $(call object_for_dir,$(BUILD_DIR_DEVICE),$(src)) $(BUILD_DIR_DEVICE)/icon.o
+$(BUILD_DIR_DEVICE)/app.nwa: $(call object_for_dir,$(BUILD_DIR_DEVICE),$(src)) $(BUILD_DIR_DEVICE)/icon.o $(BUILD_DIR_DEVICE)/assets/input_bin.o
 	@echo "LD      $@"
 	$(Q) $(CC) $(CFLAGS_DEVICE) $(LDFLAGS) $^ -o $@
 
+# Rule: embed binary asset into an object file for device linking
+$(BUILD_DIR_DEVICE)/assets/input_bin.o: $(BIN_ASSET) | $(BUILD_DIR_DEVICE)
+	@echo "BINOBJ  $<"
+	$(Q) mkdir -p $(dir $@)
+	$(Q) arm-none-eabi-objcopy -I binary -O elf32-littlearm -B arm $< $@
+
 # Simulator build: produce a shared library for the simulator
-$(BUILD_DIR_SIMULATOR)/app.nwb: $(call object_for_dir,$(BUILD_DIR_SIMULATOR),$(src_simulator))
+$(BUILD_DIR_SIMULATOR)/app.nwb: $(call object_for_dir,$(BUILD_DIR_SIMULATOR),$(src_simulator)) $(BUILD_DIR_SIMULATOR)/assets/input_bin.o
 	@echo "LDSIMULATOR  $@"
-	$(Q) $(CXX_SIMULATOR) $(CFLAGS_SIMULATOR) $(LDFLAGS_SIMULATOR) $(call object_for_dir,$(BUILD_DIR_SIMULATOR),$(src_simulator)) -o $@
+	$(Q) $(CXX_SIMULATOR) $(CFLAGS_SIMULATOR) $(LDFLAGS_SIMULATOR) $(call object_for_dir,$(BUILD_DIR_SIMULATOR),$(src_simulator)) $(BUILD_DIR_SIMULATOR)/assets/input_bin.o -o $@
+
+# Rule: embed binary asset into an object file for simulator linking
+$(BUILD_DIR_SIMULATOR)/assets/input_bin.o: $(BIN_ASSET) | $(BUILD_DIR_SIMULATOR)
+	@echo "BINOBJSIM $<"
+	$(Q) mkdir -p $(dir $@)
+	$(Q) objcopy -I binary -O elf64-x86-64 -B i386:x86-64 $< $@
 
 $(BUILD_DIR_DEVICE)/src/libs/storage.o: src/libs/storage.c | $(BUILD_DIR_DEVICE)
 	@echo "CC      $^"

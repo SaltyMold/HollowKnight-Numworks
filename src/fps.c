@@ -1,5 +1,6 @@
 #include "fps.h"
 #include "libs/eadk.h"
+#include "libs/macro.h"
 #include <stdlib.h>
 
 struct fps_manager {

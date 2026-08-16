@@ -1,4 +1,5 @@
 #include "libs/eadk.h"
+#include <stdio.h>
 #include "libs/storage.h"
 #include "libs/macro.h"
 #include "fps.h"
@@ -8,10 +9,16 @@
 const char eadk_app_name[] __attribute__((section(".rodata.eadk_app_name"))) = "HollowKnight";
 const uint32_t eadk_api_level  __attribute__((section(".rodata.eadk_api_level"))) = 0;
 
+#include "data.h"
+
 int main(void) {
 
     eadk_display_push_rect_uniform(eadk_screen_rect, eadk_color_white);
-    eadk_display_draw_string("Press Back to quit", (eadk_point_t){0, 0}, true, eadk_color_black, eadk_color_white);
+    //eadk_display_draw_string("Press Back to quit", (eadk_point_t){0, 0}, true, eadk_color_black, eadk_color_white);
+
+    char buf[64] = {0};
+    data_input_copy(0, data_input_size(), &buf);
+    eadk_display_draw_string(buf, (eadk_point_t){0, 0}, false, eadk_color_black, eadk_color_white);
 
     fps_manager_t* fps = fps_manager_create(TARGET_FPS);
     while (1) {
