@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "libs/eadk.h"
+#include "game.h"
 
 typedef struct {
     uint16_t row;
@@ -15,5 +16,5 @@ typedef struct {
 uint16_t jpg_archive_tile_count(void);
 bool jpg_archive_has_tile(uint16_t row, uint16_t col);
 bool jpg_archive_get_tile(uint16_t row, uint16_t col, jpg_tile_t *tile);
-bool jpg_draw_tile(uint16_t row, uint16_t col, eadk_point_t origin);
-void jpg_draw_archive(eadk_point_t origin);
+bool jpg_draw_tile(uint16_t row, uint16_t col, map_point_t origin);
+void jpg_draw_archive(map_point_t origin);

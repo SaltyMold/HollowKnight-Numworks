@@ -2,14 +2,14 @@
 """Generate a packed binary archive from tile images stored in output/rm-black-images.
 
 Format:
-- 512 bytes bitmask (64 x 64 tiles)
+- 2048 bytes bitmask (128 x 128 tiles)
 - For each present tile, a 32-bit offset and 32-bit size little-endian entry
 - Tile payload data appended immediately after the table
 
 Tile naming convention:
     tile_r<row>_c<col>.jpg
 Example:
-    tile_r001_c038.jpg => bit index = 64 * 1 + 38
+    tile_r001_c038.jpg => bit index = 128 * 1 + 38
 """
 from __future__ import annotations
 
@@ -41,10 +41,10 @@ def parse_tile_name(path: Path):
 
 
 def build_bitmask(present_tiles):
-    bitmask = bytearray(512)
+    bitmask = bytearray(2048)
     for row, col in present_tiles:
-        index = row * 64 + col
-        if 0 <= index < 64 * 64:
+        index = row * 128 + col
+        if 0 <= index < 128 * 128:
             byte_index = index // 8
             bit_index = index % 8
             bitmask[byte_index] |= 1 << bit_index
@@ -60,10 +60,10 @@ def collect_tiles(input_dir: Path):
         if parsed is None:
             continue
         row, col = parsed
-        if row >= 64 or col >= 64:
+        if row >= 128 or col >= 128:
             continue
         tiles.append((row, col, path))
-    return sorted(tiles, key=lambda item: (item[0] * 64 + item[1], item[2].name))
+    return sorted(tiles, key=lambda item: (item[0] * 128 + item[1], item[2].name))
 
 
 def generate_archive(input_dir: Path, output_path: Path):
@@ -75,7 +75,7 @@ def generate_archive(input_dir: Path, output_path: Path):
     bitmask = build_bitmask(present_tiles)
 
     entries = []
-    current_offset = 512 + (len(tile_entries) * 8)
+    current_offset = 2048 + (len(tile_entries) * 8)
     for row, col, path in tile_entries:
         data = path.read_bytes()
         entries.append({
@@ -87,15 +87,15 @@ def generate_archive(input_dir: Path, output_path: Path):
         })
         current_offset += len(data)
 
-    output = bytearray(512 + len(entries) * 8 + sum(len(item["data"]) for item in entries))
-    output[0:512] = bitmask
+    output = bytearray(2048 + len(entries) * 8 + sum(len(item["data"]) for item in entries))
+    output[0:2048] = bitmask
 
-    cursor = 512
+    cursor = 2048
     for entry in entries:
         struct.pack_into("<II", output, cursor, entry["offset"], entry["size"])
         cursor += 8
 
-    cursor = 512 + len(entries) * 8
+    cursor = 2048 + len(entries) * 8
     for entry in entries:
         output[cursor:cursor + len(entry["data"])] = entry["data"]
         cursor += len(entry["data"])

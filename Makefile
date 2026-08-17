@@ -30,14 +30,21 @@ src = $(addprefix src/,\
   libs/storage.c \
   main.c \
   jpg.c \
-	data.c \
+  data.c \
 )
-
-BIN_ASSET = assets/input.bin
-
 
 # Platform selection: set PLATFORM=simulator when building/running on host simulator
 PLATFORM ?= device
+
+# Binary asset selection per PLATFORM: use different input for device vs simulator
+BIN_ASSET_DEVICE = assets/input.bin
+BIN_ASSET_SIMULATOR = assets/input.bin
+
+# Default to device asset, override when building for simulator
+BIN_ASSET := $(BIN_ASSET_DEVICE)
+ifeq ($(PLATFORM),simulator)
+BIN_ASSET := $(BIN_ASSET_SIMULATOR)
+endif
 
 ifeq ($(PLATFORM),simulator)
 # Add simulator-only flags and sources
@@ -80,7 +87,7 @@ endif
 build: $(BUILD_TARGET)
 
 .PHONY: check
-check: $(BUILD_DIR_DEVICE)/app.bin
+check: $(BUILD_DIR_DEVICE)/app.nwa
 
 
 .PHONY: run
@@ -105,11 +112,21 @@ $(BUILD_DIR_DEVICE)/app.nwa: $(call object_for_dir,$(BUILD_DIR_DEVICE),$(src)) $
 	@echo "LD      $@"
 	$(Q) $(CC) $(CFLAGS_DEVICE) $(LDFLAGS) $^ -o $@
 
+# Normalize binary asset to fixed path (so objcopy generates consistent symbols)
+# Use intermediate .PHONY rule to force checking when PLATFORM changes
+.PHONY: _update_input_bin
+_update_input_bin:
+	@mkdir -p assets
+	@if [ ! -f assets/input.bin ] || ! cmp -s $(BIN_ASSET) assets/input.bin; then cp $(BIN_ASSET) assets/input.bin; fi
+
+assets/input.bin: _update_input_bin
+	@:
+
 # Rule: embed binary asset into an object file for device linking
-$(BUILD_DIR_DEVICE)/assets/input_bin.o: $(BIN_ASSET) | $(BUILD_DIR_DEVICE)
+$(BUILD_DIR_DEVICE)/assets/input_bin.o: assets/input.bin | $(BUILD_DIR_DEVICE)
 	@echo "BINOBJ  $<"
 	$(Q) mkdir -p $(dir $@)
-	$(Q) arm-none-eabi-objcopy -I binary -O elf32-littlearm -B arm $< $@
+	$(Q) arm-none-eabi-objcopy -I binary -O elf32-littlearm -B arm --rename-section .data=.rodata $< $@
 
 # Simulator build: produce a shared library for the simulator
 $(BUILD_DIR_SIMULATOR)/app.nwb: $(call object_for_dir,$(BUILD_DIR_SIMULATOR),$(src_simulator)) $(BUILD_DIR_SIMULATOR)/assets/input_bin.o
@@ -117,7 +134,7 @@ $(BUILD_DIR_SIMULATOR)/app.nwb: $(call object_for_dir,$(BUILD_DIR_SIMULATOR),$(s
 	$(Q) $(CXX_SIMULATOR) $(CFLAGS_SIMULATOR) $(LDFLAGS_SIMULATOR) $(call object_for_dir,$(BUILD_DIR_SIMULATOR),$(src_simulator)) $(BUILD_DIR_SIMULATOR)/assets/input_bin.o -o $@
 
 # Rule: embed binary asset into an object file for simulator linking
-$(BUILD_DIR_SIMULATOR)/assets/input_bin.o: $(BIN_ASSET) | $(BUILD_DIR_SIMULATOR)
+$(BUILD_DIR_SIMULATOR)/assets/input_bin.o: assets/input.bin | $(BUILD_DIR_SIMULATOR)
 	@echo "BINOBJSIM $<"
 	$(Q) mkdir -p $(dir $@)
 	$(Q) objcopy -I binary -O elf64-x86-64 -B i386:x86-64 $< $@
@@ -157,6 +174,7 @@ $(BUILD_DIR_SIMULATOR):
 .PHONY: clean
 clean:
 	@echo "CLEAN"
+	@rm -f assets/input.bin
 	$(Q) if [ "$(origin PLATFORM)" = "file" ]; then \
 		rm -rf $(BUILD_DIR_DEVICE) $(BUILD_DIR_SIMULATOR); \
 	elif [ "$(PLATFORM)" = "simulator" ]; then \

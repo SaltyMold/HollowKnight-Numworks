@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert an input image into many 320x240 JPEG tiles.
+"""Convert an input image into many 160x120 JPEG tiles.
 
 Usage:
   python main.py --input input.png --output output
@@ -88,11 +88,11 @@ def tile_image(
 
 
 def main():
-    p = argparse.ArgumentParser(description="Slice an image into 320x240 JPEG tiles")
+    p = argparse.ArgumentParser(description="Slice an image into 160x120 JPEG tiles")
     p.add_argument("--input", "-i", default=str(resolve_default_path("input")), help="Input image path")
     p.add_argument("--output", "-o", default=str(resolve_default_path("output", "map-to-images")), help="Output directory")
-    p.add_argument("--tile-width", type=int, default=320, help="Tile width (default 320)")
-    p.add_argument("--tile-height", type=int, default=240, help="Tile height (default 240)")
+    p.add_argument("--tile-width", type=int, default=160, help="Tile width (default 160)")
+    p.add_argument("--tile-height", type=int, default=120, help="Tile height (default 120)")
     p.add_argument("--quality", type=int, default=70, help="JPEG quality 1-95 (default 70)")
     p.add_argument("--smoothing", type=float, default=0.2, help="Smoothing 0..1 (default 0.2)")
     p.add_argument("--progressive", dest="progressive", action="store_true", default=False, help="Generate progressive JPEG (unsupported by TJpgDec)")

@@ -20,7 +20,7 @@ tile_r000_c001.jpg
 tile_r001_c038.jpg
 ```
 
-The row and column numbers are used to compute the position in the 64x64 grid.
+The row and column numbers are used to compute the position in the 128x128 grid.
 
 ## 2. Remove mostly-black tiles
 
@@ -48,7 +48,7 @@ python generate-bin.py --input output/rm-black-images --output output/output.bin
 
 The generated archive follows this structure:
 
-1. Bitmask: 512 bytes (64 x 64 entries)
+1. Bitmask: 2048 bytes (128 x 128 entries)
 2. For each present tile: 8 bytes of metadata
    - 4-byte little-endian offset
    - 4-byte little-endian size
@@ -67,10 +67,10 @@ tile_r001_c038.jpg
 The bit index is:
 
 ```text
-64 * 1 + 38 = 102
+128 * 1 + 38 = 166
 ```
 
-That bit is set to `1` in the 512-byte bitmask. If a tile is absent, its bit remains `0`.
+That bit is set to `1` in the 2048-byte bitmask. If a tile is absent, its bit remains `0`.
 
 ### Offset and size
 
@@ -90,13 +90,13 @@ If a tile is present at row 1, column 38, the bit corresponding to index `102` i
 The archive layout is therefore:
 
 ```text
-[512-byte bitmask][tile0 offset][tile0 size][tile1 offset][tile1 size]...[tile data 0][tile data 1]...
+[2048-byte bitmask][tile0 offset][tile0 size][tile1 offset][tile1 size]...[tile data 0][tile data 1]...
 ```
 
 The actual ordering of metadata entries follows the tile positions in row/column order.
 
 ## Notes
 
-- The bitmask always uses a fixed 64 x 64 grid.
+- The bitmask always uses a fixed 128 x 128 grid.
 - Only files matching the valid tile naming rule are included.
 - The archive is designed to be compact and easy to read from a game runtime or loader.
