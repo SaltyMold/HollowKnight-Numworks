@@ -120,13 +120,16 @@ static int jpg_screen_out(JDEC *jd, void *bitmap, JRECT *rect) {
     int32_t block_w = (int32_t)rect->right - block_x + 1;
     int32_t block_h = (int32_t)rect->bottom - block_y + 1;
 
-    int32_t target_x = (int32_t)ctx->origin.x + block_x;
-    int32_t target_y = (int32_t)ctx->origin.y + block_y;
+    // Apply 2x zoom to the target position
+    int32_t target_x = (int32_t)ctx->origin.x + block_x * 2;
+    int32_t target_y = (int32_t)ctx->origin.y + block_y * 2;
+    int32_t zoomed_w = block_w * 2;
+    int32_t zoomed_h = block_h * 2;
 
     int32_t left = target_x < 0 ? 0 : target_x;
     int32_t top = target_y < 0 ? 0 : target_y;
-    int32_t right = target_x + block_w > EADK_SCREEN_WIDTH ? EADK_SCREEN_WIDTH : target_x + block_w;
-    int32_t bottom = target_y + block_h > EADK_SCREEN_HEIGHT ? EADK_SCREEN_HEIGHT : target_y + block_h;
+    int32_t right = target_x + zoomed_w > EADK_SCREEN_WIDTH ? EADK_SCREEN_WIDTH : target_x + zoomed_w;
+    int32_t bottom = target_y + zoomed_h > EADK_SCREEN_HEIGHT ? EADK_SCREEN_HEIGHT : target_y + zoomed_h;
 
     if (left >= EADK_SCREEN_WIDTH || top >= EADK_SCREEN_HEIGHT || right <= left || bottom <= top) {
         return 1;
@@ -138,29 +141,56 @@ static int jpg_screen_out(JDEC *jd, void *bitmap, JRECT *rect) {
         return 1;
     }
 
-    int32_t src_left = target_x < 0 ? -target_x : 0;
-    int32_t src_top = target_y < 0 ? -target_y : 0;
+    // Calculate proper source offset based on clipped screen position
+    int32_t src_left = (left - target_x) / 2;
+    int32_t src_top = (top - target_y) / 2;
 
     uint16_t *src = (uint16_t *)bitmap;
-    eadk_rect_t target = {(uint16_t)left, (uint16_t)top, out_w, out_h};
-
-    if (src_left == 0 && src_top == 0 && (int32_t)out_w == block_w && (int32_t)out_h == block_h) {
-        eadk_display_push_rect(target, src);
-    } else {
-        size_t needed_bytes = (size_t)out_w * (size_t)out_h * sizeof(eadk_color_t);
+    
+    // Process in bands to save RAM (max 16px high = ~10KB for 320 width)
+    const uint16_t band_h = 16u;
+    uint16_t band_y = 0u;
+    
+    while (band_y < out_h) {
+        uint16_t band_lines = out_h - band_y;
+        if (band_lines > band_h) {
+            band_lines = band_h;
+        }
+        
+        size_t needed_bytes = (size_t)out_w * (size_t)band_lines * sizeof(eadk_color_t);
         if (needed_bytes > ctx->pixel_buffer_size) {
             return 0;
         }
 
         eadk_color_t *pixels = (eadk_color_t *)ctx->pixel_buffer;
-        for (uint16_t y = 0; y < out_h; ++y) {
-            const uint16_t *row_start = src + (size_t)(src_top + y) * (size_t)block_w;
-            memcpy(pixels + (size_t)y * out_w,
-                   row_start + src_left,
-                   (size_t)out_w * sizeof(eadk_color_t));
+        
+        // Zoom 2x for this band
+        uint16_t dst_y = 0u;
+        for (int32_t src_y = src_top + (band_y / 2); src_y < block_h && dst_y < band_lines; ++src_y) {
+            const uint16_t *row_start = src + (size_t)src_y * (size_t)block_w;
+            
+            // Check if we need one or two output rows from this source row
+            int dup_count = (dst_y == 0u && (band_y & 1)) ? 1 : 2;
+            
+            for (int dup_y = 0; dup_y < dup_count && dst_y < band_lines; ++dup_y, ++dst_y) {
+                // Fast path: use memcpy for duplication within row
+                uint16_t dst_x = 0u;
+                for (int32_t src_x = src_left; src_x < block_w && dst_x < out_w; ++src_x) {
+                    uint16_t pixel = row_start[src_x];
+                    pixels[(size_t)dst_y * out_w + dst_x] = pixel;
+                    pixels[(size_t)dst_y * out_w + dst_x + 1u] = pixel;
+                    dst_x += 2u;
+                }
+            }
         }
-        eadk_display_push_rect(target, pixels);
+        
+        // Display this band
+        eadk_rect_t band_rect = {(uint16_t)left, (uint16_t)(top + band_y), out_w, band_lines};
+        eadk_display_push_rect(band_rect, pixels);
+        
+        band_y += band_lines;
     }
+    
     return 1;
 }
 
@@ -173,7 +203,7 @@ static bool jpg_draw_jpeg_bytes(const uint8_t *jpeg_data, size_t jpeg_size, map_
         return false;
     }
 
-    static uint8_t pixel_buffer[16 * 1024];  // 16KB suffit pour le clipping (au lieu de 64KB)
+    static uint8_t pixel_buffer[10 * 1024];  // 10KB for band rendering (320*16*2)
     JDEC jd = {0};
     uint8_t work[ TJPGD_WORKSPACE_SIZE ];
     jpg_decode_context_t ctx;

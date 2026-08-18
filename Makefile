@@ -37,8 +37,8 @@ src = $(addprefix src/,\
 PLATFORM ?= device
 
 # Binary asset selection per PLATFORM: use different input for device vs simulator
-BIN_ASSET_DEVICE = assets/input.bin
-BIN_ASSET_SIMULATOR = assets/input.bin
+BIN_ASSET_DEVICE = assets/input_device.bin
+BIN_ASSET_SIMULATOR = assets/input_sim.bin
 
 # Default to device asset, override when building for simulator
 BIN_ASSET := $(BIN_ASSET_DEVICE)
