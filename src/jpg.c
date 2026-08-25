@@ -6,7 +6,8 @@
 #include "data.h"
 #include "libs/TJpg_Decoder/tjpgd.h"
 
-#define JPG_GRID_SIZE 128u
+#define JPG_GRID_ROWS 98u
+#define JPG_GRID_COLS 112u
 #define JPG_TILE_WIDTH 160u
 #define JPG_TILE_HEIGHT 120u
 
@@ -28,25 +29,29 @@ static uint32_t jpg_u32le(const uint8_t *ptr) {
 static bool jpg_bit_is_set(uint16_t row, uint16_t col) {
     const uint8_t *archive = data_input_ptr();
     size_t archive_size = data_input_size();
+    size_t bitmask_size = ((size_t)JPG_GRID_ROWS * (size_t)JPG_GRID_COLS + 7u) / 8u;
 
-    if (archive == NULL || archive_size < 2048u) {
+    if (archive == NULL || archive_size < bitmask_size) {
         return false;
     }
 
-    if (row >= JPG_GRID_SIZE || col >= JPG_GRID_SIZE) {
+    if (row >= JPG_GRID_ROWS || col >= JPG_GRID_COLS) {
         return false;
     }
 
-    uint32_t index = ((uint32_t)row * (uint32_t)JPG_GRID_SIZE) + (uint32_t)col;
-    uint32_t byte_index = index / 8u;
+    uint32_t index = ((uint32_t)row * (uint32_t)JPG_GRID_COLS) + (uint32_t)col;
+    size_t byte_index = (size_t)index / 8u;
+    if (byte_index >= bitmask_size) {
+        return false;
+    }
     uint8_t mask = (uint8_t)(1u << (index % 8u));
     return (archive[byte_index] & mask) != 0u;
 }
 
 uint16_t jpg_archive_tile_count(void) {
     uint16_t count = 0;
-    for (uint16_t row = 0; row < JPG_GRID_SIZE; ++row) {
-        for (uint16_t col = 0; col < JPG_GRID_SIZE; ++col) {
+    for (uint16_t row = 0; row < JPG_GRID_ROWS; ++row) {
+        for (uint16_t col = 0; col < JPG_GRID_COLS; ++col) {
             if (jpg_bit_is_set(row, col)) {
                 ++count;
             }
@@ -60,24 +65,25 @@ bool jpg_archive_has_tile(uint16_t row, uint16_t col) {
 }
 
 bool jpg_archive_get_tile(uint16_t row, uint16_t col, jpg_tile_t *tile) {
-    if (tile == NULL || row >= JPG_GRID_SIZE || col >= JPG_GRID_SIZE) {
+    if (tile == NULL || row >= JPG_GRID_ROWS || col >= JPG_GRID_COLS) {
         return false;
     }
 
     const uint8_t *archive = data_input_ptr();
     size_t archive_size = data_input_size();
-    if (archive == NULL || archive_size < 2048u) {
+    size_t bitmask_size = ((size_t)JPG_GRID_ROWS * (size_t)JPG_GRID_COLS + 7u) / 8u;
+    if (archive == NULL || archive_size < bitmask_size) {
         return false;
     }
 
     uint32_t before = 0;
-    for (uint16_t r = 0; r < JPG_GRID_SIZE; ++r) {
-        for (uint16_t c = 0; c < JPG_GRID_SIZE; ++c) {
+    for (uint16_t r = 0; r < JPG_GRID_ROWS; ++r) {
+        for (uint16_t c = 0; c < JPG_GRID_COLS; ++c) {
             if (!jpg_bit_is_set(r, c)) {
                 continue;
             }
             if (r == row && c == col) {
-                size_t metadata_offset = 2048u + (size_t)before * 8u;
+                size_t metadata_offset = bitmask_size + (size_t)before * 8u;
                 if (archive_size < metadata_offset + 8u) {
                     return false;
                 }
@@ -173,7 +179,7 @@ static int jpg_screen_out(JDEC *jd, void *bitmap, JRECT *rect) {
             int dup_count = (dst_y == 0u && (band_y & 1)) ? 1 : 2;
             
             for (int dup_y = 0; dup_y < dup_count && dst_y < band_lines; ++dup_y, ++dst_y) {
-                // Fast path: use memcpy for duplication within row
+                // use memcpy for duplication within row
                 uint16_t dst_x = 0u;
                 for (int32_t src_x = src_left; src_x < block_w && dst_x < out_w; ++src_x) {
                     uint16_t pixel = row_start[src_x];
@@ -192,10 +198,6 @@ static int jpg_screen_out(JDEC *jd, void *bitmap, JRECT *rect) {
     }
     
     return 1;
-}
-
-void jpg_init(void) {
-    // Les données se chargent on-demand dans jpg_bit_is_set()
 }
 
 static bool jpg_draw_jpeg_bytes(const uint8_t *jpeg_data, size_t jpeg_size, map_point_t origin) {
@@ -243,8 +245,8 @@ bool jpg_draw_tile(uint16_t row, uint16_t col, map_point_t origin) {
 }
 
 void jpg_draw_archive(map_point_t origin) {
-    for (uint16_t row = 0; row < JPG_GRID_SIZE; ++row) {
-        for (uint16_t col = 0; col < JPG_GRID_SIZE; ++col) {
+    for (uint16_t row = 0; row < JPG_GRID_ROWS; ++row) {
+        for (uint16_t col = 0; col < JPG_GRID_COLS; ++col) {
             if (!jpg_archive_has_tile(row, col)) {
                 continue;
             }

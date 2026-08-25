@@ -8,12 +8,14 @@ const char eadk_app_name[] __attribute__((section(".rodata.eadk_app_name"))) = "
 const uint32_t eadk_api_level  __attribute__((section(".rodata.eadk_api_level"))) = 0;
 
 map_point_t camera = {5000, 5000};
-map_point_t player = {0, 0};
+map_point_t player = {5000, 5000};
 
 #define TILE_WIDTH 320
 #define TILE_HEIGHT 240
 #define TILE_COLS 56
 #define TILE_ROWS 49
+
+#define PLAYER_SPEED 8
 
 static inline bool tile_in_bounds(int16_t col, int16_t row) {
     return col >= 0 && col < TILE_COLS && row >= 0 && row < TILE_ROWS;
@@ -40,14 +42,18 @@ static void draw_visible_tiles(int16_t tile_col, int16_t tile_row, int16_t pixel
     }
 }
 
+void display_player(){
+    int16_t screen_x = player.x - camera.x;
+    int16_t screen_y = player.y - camera.y;
+    eadk_display_push_rect_uniform((eadk_rect_t){screen_x, screen_y, 12, 24}, eadk_color_white);
+}
+
 int main(void) {
     eadk_display_push_rect_uniform(eadk_screen_rect, eadk_color_black);
 
     fps_manager_t* fps = fps_manager_create(TARGET_FPS);
     
-    uint64_t frame_count = 0;
     while (1) {
-        frame_count++;
 
         fps_stats_t stats;
         int dx = 0;
@@ -59,43 +65,52 @@ int main(void) {
         eadk_keyboard_state_t state = eadk_keyboard_scan();
         if (eadk_keyboard_key_down(state, eadk_key_home)) break;
 
-        if (eadk_keyboard_key_down(state, eadk_key_left)) dx -= 1;
-        if (eadk_keyboard_key_down(state, eadk_key_right)) dx += 1;
-        if (eadk_keyboard_key_down(state, eadk_key_up)) dy -= 1;
-        if (eadk_keyboard_key_down(state, eadk_key_down)) dy += 1;
+        if (eadk_keyboard_key_down(state, eadk_key_left)) dx -= PLAYER_SPEED;
+        if (eadk_keyboard_key_down(state, eadk_key_right)) dx += PLAYER_SPEED;
+        if (eadk_keyboard_key_down(state, eadk_key_up)) dy -= PLAYER_SPEED;
+        if (eadk_keyboard_key_down(state, eadk_key_down)) dy += PLAYER_SPEED;
 
-        camera.x += dx;
-        camera.y += dy;
+        player.x += dx;
+        player.y += dy;
 
-        // Clamp camera to map bounds
-        if (camera.x < 0) camera.x = 0;
-        if (camera.y < 0) camera.y = 0;
-        if (camera.x > MAP_WIDTH - 320) camera.x = MAP_WIDTH - 320;
-        if (camera.y > MAP_HEIGHT - 240) camera.y = MAP_HEIGHT - 240;
+        // Clamp player to map bounds
+        if (player.x < 0) player.x = 0;
+        if (player.y < 0) player.y = 0;
+        if (player.x > MAP_WIDTH - 320) player.x = MAP_WIDTH - 320;
+        if (player.y > MAP_HEIGHT - 240) player.y = MAP_HEIGHT - 240;
 
-        // Calculate tile indices and pixel offset
+        // When player is near the edges of the screen, camera follows
+        if (player.x < camera.x + 60) {
+            camera.x = player.x - 60;
+        } else if (player.x > camera.x + 240) {
+            camera.x = player.x - 240;
+        }
+        if (player.y < camera.y + 45) {
+            camera.y = player.y - 45;
+        } else if (player.y > camera.y + 180) {
+            camera.y = player.y - 180;
+        }
+
+        // Calculate tile indices and pixel offset based on camera
         int16_t tile_col = camera.x / 320;
         int16_t tile_row = camera.y / 240;
         int16_t pixel_offset_x = camera.x % 320;
         int16_t pixel_offset_y = camera.y % 240;
         
-        // if (frame_count % 4 == 0) {
-        //     //eadk_display_push_rect_uniform(eadk_screen_rect, eadk_color_black);
-        //     draw_visible_tiles(tile_col, tile_row, pixel_offset_x, pixel_offset_y);
-        // }
         draw_visible_tiles(tile_col, tile_row, pixel_offset_x, pixel_offset_y);
+        display_player();
 
-        {
-            char buffer[64];
-            snprintf(buffer, sizeof(buffer), "Camera: (%d, %d)", camera.x, camera.y);
-            eadk_display_draw_string(buffer, (eadk_point_t){0, 220}, true, eadk_color_white, eadk_color_black);
-        }
+        // {
+        //     char buffer[64];
+        //     snprintf(buffer, sizeof(buffer), "Camera: (%d, %d)", camera.x, camera.y);
+        //     eadk_display_draw_string(buffer, (eadk_point_t){0, 220}, true, eadk_color_white, eadk_color_black);
+        // }
 
         /*------------------------------------------*/
 
         fps_manager_end_frame(fps, &stats);
-        //fps_manager_cap_frame(fps, &stats);
-        fps_display_stats(&stats, (eadk_point_t){0, 0});
+        fps_manager_cap_frame(fps, &stats);
+        //fps_display_stats(&stats, (eadk_point_t){0, 0});
     }
     fps_manager_destroy(fps);
 

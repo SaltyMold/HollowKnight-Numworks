@@ -3,9 +3,9 @@
 
 #include "libs/eadk.h"
 
-#define TARGET_FPS 240
+#define TARGET_FPS 20
 
-// map 56*49
+// map 112*98
 #define MAP_WIDTH 17920
 #define MAP_HEIGHT 11760
 
